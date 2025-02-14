@@ -56,6 +56,14 @@ pub fn shift_rows(state : &mut [FheUint8;16]){
     state[15] = temp[11];
 }
 
+/// add blocks bitwise or operation on state and key
+
+pub fn add_blocks(state: &mut [FheUint8;16], b: &mut [FheUint8; 16]){
+    for j in 0..16{
+        state[j] ^= b[j];
+    }
+}
+
 /// aes encrypt cipher block
 /// 1. generate round keys using key expansion
 /// 2. perform 9 rounds of sub_bytes, shift_rows, mix_columns and add_blocks
