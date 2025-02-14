@@ -1,4 +1,4 @@
-use super::constants::{SBOX};
+use super::constants::{SBOX, ROUND_CONSTS};
 use tfhe::prelude::*;
 use tfhe::{
     generate_keys, set_server_key, ConfigBuilder, FheUint8, MatchValues,
@@ -41,8 +41,21 @@ pub fn expand_keys(key: &[FheUint8;16], expanded_keys: &mut[FheUint8;176]){
 
         if st % 16 == 0{
             // rotate left
-            // subtitute 
+            temp.rotate_left(1);
+            // subtitute using SBOX and match_value
+            for j in 0..4{
+                let match_values = generate_match_table();
+                let (result, matched) = temp[j].match_value(&match_values).unwrap();
+                let matched = matched.decrypt(&client_key);
+                if matched{
+                    temp[j] = result;
+                }
+            }
             // xor
+            // generate fhe encrypted round constant first
+            let encrypted_round_const = FheUint8::encrypt(ROUND_CONSTS[st / 16], &client_key);
+            // xor with encrypted round constant 
+            temp[0] ^= encrypted_round_const;
         }
 
         for j in 0..4{
