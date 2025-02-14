@@ -21,8 +21,7 @@ pub fn expand_keys(key: &[FheUint8;16], expanded_keys: &mut[FheUint8;176]){
     set_server_key(server_key);
     // copy the key elements to first 16 elements of expanded_keys
     // this is because the first key is the same as provided
-    // copy_from_slice not supported for FheUint8 
-    // try_into doesn't work because size of [FheUint<FheUint8Id>] not known at compile time
+    // cannot operate on a slice of expanded_keys therefore have to loop around from 0 to 16
     // too much use of clone(), need to figure out alternative
 
     for i in 0..16{
