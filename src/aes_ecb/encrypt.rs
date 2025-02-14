@@ -4,6 +4,8 @@ use tfhe::{
     generate_keys, set_server_key, ConfigBuilder, FheUint8, MatchValues,
 };
 
+/// byte substitution
+
 pub fn sub_bytes(state : &mut [FheUint8;16]){
     let match_values = generate_match_table();
     for byte in state.iter_mut(){
@@ -13,6 +15,45 @@ pub fn sub_bytes(state : &mut [FheUint8;16]){
             *byte = result;
         }
     }
+}
+
+/// shift rows 
+
+pub fn shift_rows(state : &mut [FheUint8;16]){
+    let config = ConfigBuilder::default().build();
+
+    let (client_key, server_key) = generate_keys(config);
+
+    set_server_key(server_key);
+
+    let fhe_zero = FheUint8::encrypt(0u8, &client_key);
+
+    let mut temp: [FheUint8;16] = std::array::from_fn(|_| fhe_zero.clone());
+    temp.copy_from_slice(state);
+
+    // column 0
+    state[0] = temp[0];
+    state[1] = temp[5];
+    state[2] = temp[10];
+    state[3] = temp[15];
+
+    // column 1
+    state[4] = temp[4];
+    state[5] = temp[9];
+    state[6] = temp[14];
+    state[7] = temp[3];
+
+    // column 2
+    state[8] = temp[8];
+    state[9] = temp[13];
+    state[10] = temp[2];
+    state[11] = temp[7];
+
+    // column 3
+    state[12] = temp[12];
+    state[13] = temp[1];
+    state[14] = temp[6];
+    state[15] = temp[11];
 }
 
 /// aes encrypt cipher block
