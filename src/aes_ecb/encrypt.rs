@@ -1,15 +1,21 @@
 use super::expand::{expand_keys, generate_match_table};
+use super::utils::fhe_zero;
 use tfhe::prelude::*;
 use tfhe::{
-    generate_keys, set_server_key, ConfigBuilder, FheUint8, MatchValues,
+    generate_keys, set_server_key, ConfigBuilder, FheUint8,
 };
-
 /// byte substitution
 
 pub fn sub_bytes(state : &mut [FheUint8;16]){
+    let config = ConfigBuilder::default().build();
+
+    let (client_key, server_key) = generate_keys(config);
+
+    set_server_key(server_key);
+
     let match_values = generate_match_table();
     for byte in state.iter_mut(){
-        let (result, matched) = byte.match_values(&match_values).unwrap();
+        let (result, matched) = byte.match_value(&match_values).unwrap();
         let matched = matched.decrypt(&client_key);
         if matched{
             *byte = result;
@@ -18,6 +24,7 @@ pub fn sub_bytes(state : &mut [FheUint8;16]){
 }
 
 /// shift rows 
+/// too much clone, need to figure out alternative solution
 
 pub fn shift_rows(state : &mut [FheUint8;16]){
     let config = ConfigBuilder::default().build();
@@ -29,39 +36,58 @@ pub fn shift_rows(state : &mut [FheUint8;16]){
     let fhe_zero = FheUint8::encrypt(0u8, &client_key);
 
     let mut temp: [FheUint8;16] = std::array::from_fn(|_| fhe_zero.clone());
-    temp.copy_from_slice(state);
+    for i in 0..16 {
+        temp[i] = state[i].clone();
+    }
 
     // column 0
-    state[0] = temp[0];
-    state[1] = temp[5];
-    state[2] = temp[10];
-    state[3] = temp[15];
+    state[0] = temp[0].clone();
+    state[1] = temp[5].clone();
+    state[2] = temp[10].clone();
+    state[3] = temp[15].clone();
 
     // column 1
-    state[4] = temp[4];
-    state[5] = temp[9];
-    state[6] = temp[14];
-    state[7] = temp[3];
+    state[4] = temp[4].clone();
+    state[5] = temp[9].clone();
+    state[6] = temp[14].clone();
+    state[7] = temp[3].clone();
 
     // column 2
-    state[8] = temp[8];
-    state[9] = temp[13];
-    state[10] = temp[2];
-    state[11] = temp[7];
+    state[8] = temp[8].clone();
+    state[9] = temp[13].clone();
+    state[10] = temp[2].clone();
+    state[11] = temp[7].clone();
 
     // column 3
-    state[12] = temp[12];
-    state[13] = temp[1];
-    state[14] = temp[6];
-    state[15] = temp[11];
+    state[12] = temp[12].clone();
+    state[13] = temp[1].clone();
+    state[14] = temp[6].clone();
+    state[15] = temp[11].clone();
 }
 
 /// add blocks bitwise or operation on state and key
 
 pub fn add_blocks(state: &mut [FheUint8;16], b: &mut [FheUint8; 16]){
     for j in 0..16{
-        state[j] ^= b[j];
+        state[j] ^= b[j].clone();
     }
+}
+
+/// galios multiplication
+
+pub fn galios_mul(a: FheUint8, b: FheUint8) -> FheUint8{
+    let mut result: FheUint8 = fhe_zero();
+    let mut a = a;
+    let mut b = b;
+
+    const IRREDUCIBLE_POLY: u8 = 0x1b;
+    result
+}
+
+/// mix columns 
+
+pub fn mix_columns(state: &mut [FheUint8;16]) {
+
 }
 
 /// aes encrypt cipher block
@@ -70,7 +96,7 @@ pub fn add_blocks(state: &mut [FheUint8;16], b: &mut [FheUint8; 16]){
 /// 3. perform last round omitting mix_columns 
 
 pub fn encrypt(vi: &mut [FheUint8;16], key: &mut [FheUint8;16]){
-    let mut state = *input;
+    let mut state = vi.clone();
 
     let config = ConfigBuilder::default().build();
 
@@ -81,5 +107,5 @@ pub fn encrypt(vi: &mut [FheUint8;16], key: &mut [FheUint8;16]){
     let fhe_zero = FheUint8::encrypt(0u8, &client_key);
 
     let mut expanded_keys: [FheUint8;176] = std::array::from_fn(|_| fhe_zero.clone());
-    expand_keys(&mut key, &mut expanded_keys);
+    expand_keys(key, &mut expanded_keys);
 }
