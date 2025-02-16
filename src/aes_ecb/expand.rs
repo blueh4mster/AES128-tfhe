@@ -1,5 +1,5 @@
 use super::constants::{SBOX, ROUND_CONSTS};
-use super::utils::fhe_zero;
+use super::utils::fhe_uint;
 use tfhe::prelude::*;
 use tfhe::{
     generate_keys, set_server_key, ConfigBuilder, FheUint8, MatchValues,

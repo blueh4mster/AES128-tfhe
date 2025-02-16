@@ -1,9 +1,11 @@
 use super::expand::{expand_keys, generate_match_table};
-use super::utils::fhe_zero;
+use super::utils::fhe_uint;
 use tfhe::prelude::*;
 use tfhe::{
-    generate_keys, set_server_key, ConfigBuilder, FheUint8,
+    generate_keys, set_server_key, ConfigBuilder, FheUint8, MatchValues
 };
+
+
 /// byte substitution
 
 pub fn sub_bytes(state : &mut [FheUint8;16]){
@@ -27,13 +29,8 @@ pub fn sub_bytes(state : &mut [FheUint8;16]){
 /// too much clone, need to figure out alternative solution
 
 pub fn shift_rows(state : &mut [FheUint8;16]){
-    let config = ConfigBuilder::default().build();
-
-    let (client_key, server_key) = generate_keys(config);
-
-    set_server_key(server_key);
-
-    let fhe_zero = FheUint8::encrypt(0u8, &client_key);
+    
+    let fhe_zero = fhe_uint(0u8);
 
     let mut temp: [FheUint8;16] = std::array::from_fn(|_| fhe_zero.clone());
     for i in 0..16 {
@@ -74,20 +71,48 @@ pub fn add_blocks(state: &mut [FheUint8;16], b: &mut [FheUint8; 16]){
 }
 
 /// galios multiplication
-
 pub fn galios_mul(a: FheUint8, b: FheUint8) -> FheUint8{
-    let mut result: FheUint8 = fhe_zero();
+    let mut res: FheUint8 = fhe_uint(0u8);
     let mut a = a;
     let mut b = b;
 
-    const IRREDUCIBLE_POLY: u8 = 0x1b;
-    result
+    let ip: u8 = 0x1b;
+    let irreducible_poly: FheUint8 = fhe_uint(ip);
+    let fhe_one = fhe_uint(1u8);
+    let c = fhe_uint(0x80);
+
+    let config = ConfigBuilder::default().build();
+    let (client_key, server_key) = generate_keys(config);
+    set_server_key(server_key);
+
+    let match_values = MatchValues::new(vec![(0u8, 0u8)]).unwrap();
+
+    loop {
+        let (_, matched): (FheUint8, _) = b.clone().match_value(&match_values).unwrap();
+        let matched = matched.decrypt(&client_key);
+        if matched{
+            break;
+        }
+        let temp = b.clone() & fhe_one.clone();
+        let (_, matched): (FheUint8, _) = temp.match_value(&match_values).unwrap();
+        let matched = matched.decrypt(&client_key);
+        if matched{
+            res ^= a.clone();
+        }
+        let temp_2 = a.clone() & c.clone();
+        let (_, matched): (FheUint8, _) = temp_2.match_value(&match_values).unwrap();
+        let matched = matched.decrypt(&client_key);
+        if !matched {
+            a ^= irreducible_poly.clone();
+        }
+        b >>= fhe_one.clone();
+    }
+    res
 }
 
 /// mix columns 
 
 pub fn mix_columns(state: &mut [FheUint8;16]) {
-
 }
 
 /// aes encrypt cipher block
